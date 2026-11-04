@@ -85,6 +85,12 @@ function creerTableauDynamicAdmin(table, data, affichageSupprimer, affichageData
 const LISTE_SEPARATEUR = ' / ';
 const LISTE_SUFFIXE = ' ...';
 
+// Temps laissé pour rejoindre le tooltip à la souris après avoir quitté la
+// cellule. Couvre le petit écart entre les deux et les trajectoires obliques.
+const DELAI_GRACE_TOOLTIP = 250;
+let tooltipMasquage = null;   // identifiant du setTimeout de masquage en cours
+let tooltipAffiche = null;    // tooltip actuellement ouvert, pour ne pas le repositionner
+
 // Canvas réutilisé pour mesurer du texte sans rien insérer dans le DOM.
 let listeContexteMesure = null;
 function listeMesurerTexte(texte, police) {
@@ -109,6 +115,36 @@ function planifierAjustementListe() {
     });
 }
 
+// Affiche le tooltip d'une cellule, ancré à la position du pointeur.
+function afficherTooltipCellule(cellule, x, y) {
+    const tooltip = cellule.querySelector('.tooltiptextcustom');
+    if (!tooltip) return;
+    clearTimeout(tooltipMasquage);
+    // On ne repositionne qu'à l'entrée, pas à chaque mouvement : un tooltip
+    // qui suit le curseur fuit devant lui dès qu'on cherche à l'atteindre.
+    if (tooltipAffiche !== tooltip) {
+        positionnerTooltip(cellule, tooltip, x, y);
+        tooltipAffiche = tooltip;
+    }
+    tooltip.style.visibility = 'visible';
+    tooltip.style.opacity = '1';
+}
+
+// Programme le masquage après le délai de grâce. On ne force jamais le
+// masquage : on retire les styles en ligne pour rendre la main au CSS
+// (.tooltipcustom:hover), de sorte que les autres pages d'administration
+// continuent de fonctionner au :hover seul.
+function programmerMasquageTooltip(cellule) {
+    const tooltip = cellule.querySelector('.tooltiptextcustom');
+    if (!tooltip) return;
+    clearTimeout(tooltipMasquage);
+    tooltipMasquage = setTimeout(function () {
+        tooltip.style.visibility = '';
+        tooltip.style.opacity = '';
+        if (tooltipAffiche === tooltip) tooltipAffiche = null;
+    }, DELAI_GRACE_TOOLTIP);
+}
+
 // Positionne le tooltip en coordonnées viewport.
 //
 // Pourquoi remplacer la bascule .toTop :
@@ -120,7 +156,13 @@ function planifierAjustementListe() {
 // En position:fixed avec des coordonnées calculées, aucune de ces hypothèses
 // n'est nécessaire : plus de rognage, et le basculement au-dessus/au-dessous
 // se décide sur la hauteur réelle du tooltip.
-function positionnerTooltip(cellule, tooltip) {
+function positionnerTooltip(cellule, tooltip, pointeurX, pointeurY) {
+    // Marge vis-a-vis des bords de la fenetre uniquement. Entre la cellule et
+    // le tooltip il ne doit y avoir AUCUN espace : le tooltip est un
+    // descendant DOM de la cellule, donc le :hover de celle-ci reste vrai tant
+    // que le pointeur est sur l'un ou sur l'autre — mais un trou, meme de
+    // quelques pixels, suffit a le perdre en cours de route et a faire
+    // disparaitre le tooltip avant qu'on l'atteigne.
     const MARGE = 4;
 
     // Remise à zéro avant mesure (la classe .toTop n'est plus utilisée).
@@ -138,14 +180,25 @@ function positionnerTooltip(cellule, tooltip) {
     const cell = cellule.getBoundingClientRect();
     const tip = tooltip.getBoundingClientRect();
 
-    // Sous la cellule si la place le permet, au-dessus sinon.
-    let top = cell.bottom + MARGE;
-    if (top + tip.height > window.innerHeight) {
-        top = cell.top - tip.height - MARGE;
+    // Ancré sur le pointeur quand on connaît sa position : le tooltip
+    // apparaît là où est la souris, et non sur le bord gauche d'une colonne
+    // qui fait plus de mille pixels de large. À défaut, repli sur la cellule,
+    // avec un chevauchement d'un pixel (accoler ne suffit pas : les
+    // rectangles ont des coordonnées fractionnaires et l'arrondi final
+    // recrée un jeu d'un pixel).
+    const DECALAGE = 12;                 // petit écart pour ne pas masquer le texte visé
+    const CHEVAUCHEMENT = 1;
+    const aPointeur = (typeof pointeurX === 'number' && typeof pointeurY === 'number');
+
+    let top = aPointeur ? pointeurY + DECALAGE : cell.bottom - CHEVAUCHEMENT;
+    if (top + tip.height > window.innerHeight - MARGE) {
+        // Pas la place en dessous : on bascule au-dessus.
+        top = aPointeur ? pointeurY - tip.height - DECALAGE : cell.top - tip.height + CHEVAUCHEMENT;
     }
     top = Math.max(MARGE, Math.min(top, window.innerHeight - tip.height - MARGE));
 
-    const left = Math.max(MARGE, Math.min(cell.left, window.innerWidth - tip.width - MARGE));
+    const vise = aPointeur ? pointeurX - 24 : cell.left;
+    const left = Math.max(MARGE, Math.min(vise, window.innerWidth - tip.width - MARGE));
 
     tooltip.style.top = Math.round(top) + 'px';
     tooltip.style.left = Math.round(left) + 'px';
@@ -474,13 +527,23 @@ $(document).ready(function() {
         });
     });
 
-    $('.table-tbody').on('mouseover', '.tooltipcustom', function () {
-        // MODIF : on utilise `this` (la cellule, cible de la délégation) et non
-        // event.target. Depuis que le texte visible est dans un
-        // <span class="texte-liste">, event.target vaut ce span dès qu'on
-        // survole le texte, et l'ancien test `nodeName == 'TD'` échouait.
-        const tooltip = this.querySelector('.tooltiptextcustom');
-        if (tooltip) positionnerTooltip(this, tooltip);
+    // Affichage du tooltip. On utilise `this` (la cellule, cible de la
+    // délégation) et non event.target : depuis que le texte visible est dans
+    // un <span class="texte-liste">, event.target vaut ce span dès qu'on
+    // survole le texte.
+    //
+    // Le CSS seul (.tooltipcustom:hover) ferme le tooltip dès que le pointeur
+    // quitte la cellule, ce qui le rend impossible à atteindre pour le faire
+    // défiler. On double donc le :hover d'un pilotage JS : styles en ligne
+    // pour maintenir l'affichage, puis retrait de ces styles après un délai
+    // de grâce. On ne force jamais le masquage, on rend la main au CSS — les
+    // autres pages d'administration continuent de marcher au :hover seul.
+    $('.table-tbody').on('mouseenter', '.tooltipcustom', function (event) {
+        afficherTooltipCellule(this, event.clientX, event.clientY);
+    });
+
+    $('.table-tbody').on('mouseleave', '.tooltipcustom', function () {
+        programmerMasquageTooltip(this);
     });
 
     // CORRECTIF : ce handler faisait doublon avec celui d'administration.js, qui
