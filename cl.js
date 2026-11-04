@@ -186,13 +186,15 @@ function ajusterColonneListe() {
 
 let tooltipMasquage = null;   // setTimeout de masquage en cours
 
-// Place le tooltip sur le pointeur, en coordonnées viewport.
+// Place le tooltip SOUS le pointeur, en coordonnées viewport : le curseur se
+// retrouve déjà à l'intérieur, donc on peut parcourir et faire défiler le
+// tooltip sans jamais le quitter ni repasser par le vide.
 //
 // position:fixed et non absolute : la cellule vit dans un conteneur qui
 // défile, lequel rognerait un descendant positionné en absolute.
 function positionnerTooltip(cellule, tooltip, x, y) {
-    const MARGE = 4;        // garde vis-à-vis des bords de la fenêtre
-    const DECALAGE = 12;    // sous le pointeur, pour ne pas masquer le texte visé
+    const MARGE = 4;     // garde vis-à-vis des bords de la fenêtre
+    const DEBORD = 8;    // de combien le pointeur entre dans le tooltip
 
     tooltip.style.cssText += ';position:fixed;transform:none;bottom:auto;right:auto;z-index:1000';
     tooltip.style.top = '0px';
@@ -202,14 +204,19 @@ function positionnerTooltip(cellule, tooltip, x, y) {
     const cell = cellule.getBoundingClientRect();
     const surPointeur = (typeof x === 'number' && typeof y === 'number');
 
-    let top = surPointeur ? y + DECALAGE : cell.bottom - 1;
-    if (top + tip.height > window.innerHeight - MARGE) {
-        top = surPointeur ? y - tip.height - DECALAGE : cell.top - tip.height + 1;
-    }
-    top = Math.max(MARGE, Math.min(top, window.innerHeight - tip.height - MARGE));
+    let top = surPointeur ? y - DEBORD : cell.bottom - 1;
+    let left = surPointeur ? x - DEBORD : cell.left;
 
-    const vise = surPointeur ? x : cell.left;
-    const left = Math.max(MARGE, Math.min(vise, window.innerWidth - tip.width - MARGE));
+    top = Math.max(MARGE, Math.min(top, window.innerHeight - tip.height - MARGE));
+    left = Math.max(MARGE, Math.min(left, window.innerWidth - tip.width - MARGE));
+
+    // Le recadrage sur la fenêtre a pu éloigner le tooltip du pointeur, près
+    // d'un bord. On le ramène pour que le curseur reste dedans : c'est toute
+    // la raison d'être de ce positionnement.
+    if (surPointeur) {
+        top = Math.max(Math.min(top, y - 2), y - tip.height + 2);
+        left = Math.max(Math.min(left, x - 2), x - tip.width + 2);
+    }
 
     tooltip.style.top = Math.round(top) + 'px';
     tooltip.style.left = Math.round(left) + 'px';
