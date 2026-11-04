@@ -204,8 +204,21 @@ function positionnerTooltip(cellule, tooltip, x, y) {
     const cell = cellule.getBoundingClientRect();
     const surPointeur = (typeof x === 'number' && typeof y === 'number');
 
-    let top = surPointeur ? y - DEBORD : cell.bottom - 1;
-    let left = surPointeur ? x - DEBORD : cell.left;
+    // Par défaut le tooltip se déploie vers le bas et vers la droite, curseur
+    // calé près du coin supérieur gauche. S'il n'y a pas la place, il se
+    // déploie vers le haut (ou vers la gauche) et le curseur passe près du
+    // coin opposé. Dans les deux sens il reste à l'intérieur.
+    let top, left;
+    if (surPointeur) {
+        const placeEnBas = window.innerHeight - MARGE - y;
+        top = (placeEnBas >= tip.height - DEBORD) ? y - DEBORD : y - tip.height + DEBORD;
+
+        const placeADroite = window.innerWidth - MARGE - x;
+        left = (placeADroite >= tip.width - DEBORD) ? x - DEBORD : x - tip.width + DEBORD;
+    } else {
+        top = cell.bottom - 1;
+        left = cell.left;
+    }
 
     top = Math.max(MARGE, Math.min(top, window.innerHeight - tip.height - MARGE));
     left = Math.max(MARGE, Math.min(left, window.innerWidth - tip.width - MARGE));
