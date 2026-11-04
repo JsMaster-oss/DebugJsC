@@ -1,0 +1,194 @@
+{# =============================================================================
+   RECONSTRUCTION. Ce template n'était pas sur les captures : il est écrit en
+   miroir de categorie.html, avec les différences demandées :
+     - aucun bloc de cases à cocher « Catégories » dans les modales ;
+     - une ligne par sous-catégorie, la catégorie étant une valeur simple.
+   À comparer avec le fichier réel avant de remplacer quoi que ce soit.
+   ========================================================================== #}
+{% extends 'base_core.html' %}
+
+{% block head %}
+<script>
+    const dataRecoveryUrl = "{{ url_for('main.donnees_tableau_sous_categories_tech') }}";
+    const currentUserRole = "{{ current_user_role }}";
+</script>
+<link href="../../static/css/administration/administration.css" rel="stylesheet" type="text/css" media="all">
+<link href="../../static/css/flash.css" rel="stylesheet" type="text/css" media="all" xmlns="http://www.w3.org/1999/html">
+<link href="../../static/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" media="all" xmlns="http://www.w3.org/1999/html">
+{# Pas de colonne-liste.js : la colonne Catégorie porte une valeur simple. #}
+<script src="../../static/js/administration/sous_categorie.js" defer></script>
+<script src="../../static/js/administration/administration.js" defer></script>
+<script src="{{ url_for('static', filename= 'bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename= 'js/ajax.js') }}"></script>
+<script src="{{ url_for('static', filename= 'js/Flash/flash.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container block-content">
+    <div class="leftpanel">
+        <div class="grp-btn">
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-utilisateurs" autocomplete="off" onclick="window.location.href = '/utilisateur'">
+            <label class="first-btn btn menu-btn surcharge-btn-outline-primary" for="btn-admin-utilisateurs">Utilisateurs</label>
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-secteurs" autocomplete="off" onclick="window.location.href = '/secteur'">
+            <label class="btn menu-btn surcharge-btn-outline-primary" for="btn-admin-secteurs">Secteurs</label>
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-programmes" autocomplete="off" onclick="window.location.href = '/programme'">
+            <label class="btn menu-btn surcharge-btn-outline-primary" for="btn-admin-programmes">Programmes</label>
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-categories" autocomplete="off" onclick="window.location.href = '/categorie'">
+            <label class="btn menu-btn surcharge-btn-outline-primary" for="btn-admin-categories">Catégories Tech.</label>
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-sous-categories" autocomplete="off" active onclick="window.location.href = '/sous_categorie'">
+            <label class="btn menu-btn surcharge-btn-outline-primary active" for="btn-admin-sous-categories">Sous-Catégories Tech.</label>
+            <input type="radio" class="btn-check" name="radio-nav-graphique" id="btn-admin-logs" autocomplete="off" onclick="window.location.href = '/log'">
+            <label class="last-btn btn menu-btn surcharge-btn-outline-primary" for="btn-admin-logs">Logs</label>
+        </div>
+    </div>
+
+    <div class="twothird" >
+        <div class="container card white margin-bottom">
+            <hr>
+            <h3 class="text-grey padding-16" style="text-align: center;"> {% block title %}Liste des Sous-Catégories Technologiques{% endblock %}</h3>
+            <hr>
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div class="input-control">
+                    <label for="search">
+                        <i class="fa fa-search"></i>
+                    </label>
+                    <input type="text" id="search" placeholder="Rechercher une sous-catégorie tech">
+                </div>
+                <button id="ajouter" class="btn btn-ajouter btn-secondary" aria-label="Ajouter une sous-catégorie tech" title="Ajouter une sous-catégorie tech">Ajouter sous-catégorie technologique</button>
+            </div>
+            <div id="containeur-main">
+                <div class="tableau-deroulant">
+                    <table class="table-affichage" id="table-donnees">
+                        <thead>
+                            {# Ordre des colonnes = ordre des clés de Subcategory.to_dict() #}
+                            <tr id="en-tete">
+                                <th class="etat">État</th>
+                                <th>Sous-Catégorie Technologique</th>
+                                <th>Catégorie Technologique</th>
+                                <th class="actions">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="table-tbody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <hr>
+            <div class="page-result">
+                <div id="search-result"></div>
+                <div></div>
+            </div>
+            <hr>
+        </div>
+    </div>
+    <div class="rightpanel">
+    </div>
+
+    <!-- Fenêtre modale Création -->
+    <dialog id="creation-modal">
+        <div class="modal-dialog my-custom-modal" role="document">
+            <div class="modal-content" id="modal-detail-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">Créer une sous-catégorie technologique</h4>
+                </div>
+                <div class="modal-body">
+                    <form id="ajouter-form">
+                        <div class="form-group">
+                            <label for="subcategory">Nom de la sous-catégorie technologique</label>
+                            <input type="text" id="subcategory" name="subcategory" required>
+                        </div>
+                        {# Pas de rattachement à une catégorie ici : il se pilote
+                           depuis la page catégorie, une sous-catégorie ne pouvant
+                           appartenir qu'à une seule catégorie. #}
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button class="btn btn-secondary btn-annuler" type="button">Annuler</button>
+                            <div class="btn-container">
+                                <button type="submit" class="btn btn-secondary submit-btn">Ajouter sous-catégorie technologique</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Fenêtre modale Modification -->
+    <dialog id="modify-modal">
+        <div class="modal-dialog my-custom-modal" role="document">
+            <div class="modal-content" id="modal-detail-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">Modifier une sous-catégorie technologique</h4>
+                </div>
+                <div class="modal-body">
+                    <form id="modifier-form" id_sous_categorie="">
+                        <div class="form-group">
+                            <label for="subcategory">Nom de la sous-catégorie technologique</label>
+                            <input type="text" id="subcategory" name="subcategory" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="div-state">État</label>
+                            <div id="div-state">
+                                <label for="state">Désactiver la sous-catégorie technologique</label>
+                                <input type="checkbox" id="state">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="categorie-rattachee">Catégorie technologique</label>
+                            {# Lecture seule : le rattachement se modifie depuis la page catégorie. #}
+                            <div id="categorie-rattachee" class="valeur-lecture-seule"></div>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button class="btn btn-secondary btn-annuler" type="button">Annuler</button>
+                            <div class="btn-container">
+                                <button type="submit" class="btn btn-secondary submit-btn">Modifier sous-catégorie technologique</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Fenêtre modale Suppression -->
+    <dialog id="deletion-modal">
+        <div class="modal-dialog my-custom-modal" role="document">
+            <div class="modal-content" id="modal-detail-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">Confirmer suppression</h4>
+                </div>
+                <div class="modal-body">
+                    <form id="supprimer-form" id_sous_categorie="">
+                        <div class="form-group">
+                            <div>Êtes-vous sûr de vouloir supprimer <span id="subcategoryName"></span> ?</div>
+                        </div>
+                        <div class="modal-footer d-flex justify-content-between">
+                            <button class="btn btn-secondary btn-annuler" type="button">Annuler</button>
+                            <div class="btn-container">
+                                <button type="submit" class="btn btn-secondary submit-btn">Supprimer sous-catégorie technologique</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Fenêtre modale erreur : sert à la création, la modification ET la suppression -->
+    <dialog id="error-modal">
+        <div class="modal-dialog my-custom-modal" role="document">
+            <div class="modal-content" id="modal-detail-content">
+                <div class="modal-header">
+                    <h4 class="modal-title" id="myModalLabel">Opération impossible</h4>
+                </div>
+                <div class="modal-body">
+                    <div id="erreurSupprimer" style="white-space: pre-line;"></div>
+                </div>
+                <div class="modal-footer d-flex justify-content-between">
+                    <button class="btn btn-secondary btn-annuler" type="button">Fermer Pop-up</button>
+                </div>
+            </div>
+        </div>
+    </dialog>
+</div>
+
+{% endblock %}
