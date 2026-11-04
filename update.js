@@ -86,8 +86,9 @@ const LISTE_SEPARATEUR = ' / ';
 const LISTE_SUFFIXE = ' ...';
 
 // Temps laissé pour rejoindre le tooltip à la souris après avoir quitté la
-// cellule. Couvre le petit écart entre les deux et les trajectoires obliques.
-const DELAI_GRACE_TOOLTIP = 250;
+// cellule. À 0 le délai est désactivé : le tooltip se ferme dès la sortie,
+// comme avec le :hover CSS seul. Passer à 250 pour le réactiver.
+const DELAI_GRACE_TOOLTIP = 0;
 let tooltipMasquage = null;   // identifiant du setTimeout de masquage en cours
 let tooltipAffiche = null;    // tooltip actuellement ouvert, pour ne pas le repositionner
 
@@ -138,11 +139,19 @@ function programmerMasquageTooltip(cellule) {
     const tooltip = cellule.querySelector('.tooltiptextcustom');
     if (!tooltip) return;
     clearTimeout(tooltipMasquage);
-    tooltipMasquage = setTimeout(function () {
+
+    const masquer = function () {
         tooltip.style.visibility = '';
         tooltip.style.opacity = '';
         if (tooltipAffiche === tooltip) tooltipAffiche = null;
-    }, DELAI_GRACE_TOOLTIP);
+    };
+
+    // Délai désactivé : on masque tout de suite, sans passer par un timer.
+    if (DELAI_GRACE_TOOLTIP <= 0) {
+        masquer();
+        return;
+    }
+    tooltipMasquage = setTimeout(masquer, DELAI_GRACE_TOOLTIP);
 }
 
 // Positionne le tooltip en coordonnées viewport.
